@@ -2,28 +2,56 @@
 
 # API Keys Configuration
 api_keys:
-  # Google Gemini API Key - FREE TIER AVAILABLE!
-  # Get yours at: https://aistudio.google.com/app/apikey
+  # Prefer loading secrets from .env; keep these empty unless you want file-based fallbacks.
   google: ""
+  # Optional OpenAI API Key (only needed if you use openai:* models)
+  openai: ""
 
 # Model Configuration for Each Agent
-# FORMAT: "google:model-name"
-#
-# Available Google Gemini Models (FREE TIER):
-# It has a generous free tier for APIs, can start from here. (Details: https://ai.google.dev/gemini-api/docs/rate-limits)
-#   - "google:gemini-2.5-pro"           # Most capable, slower (100 free requests / day) - winning model
-#   - "google:gemini-2.5-flash"         # Latest & fastest (250 free requests / day)
-#   - "google:gemini-2.5-flash-lite"    # Fast & Cheap (1000 free requests / day) - good for testing
+# FORMAT: "provider:model-name"  (provider = google or openai)
 #
 models:
-  tester_agent: "google:gemini-2.5-flash"    
-  brute_agent: "google:gemini-2.5-flash"     
-  optimal_agent: "google:gemini-2.5-flash"   
+  sample_agent: "openai:gpt-5.1"
+  tester_agent: "openai:gpt-5.1"
+  brute_agent: "openai:gpt-5.1"
+  optimal_agent: "openai:gpt-5.1"
+  final_judge_agent: "openai:gpt-5.1"
 
 # Execution Parameters
 execution:
-  max_optimal_attempts: 5
+  max_brute_attempts: 12
+  max_optimal_attempts: 12
+  brute_temperatures:
+    - 0.25
+    - 0.23
+    - 0.21
+    - 0.19
+    - 0.17
+    - 0.15
+    - 0.13
+    - 0.11
+    - 0.09
+    - 0.07
+    - 0.05
+    - 0.03
+  optimal_temperatures:
+    - 0.30
+    - 0.27
+    - 0.24
+    - 0.21
+    - 0.18
+    - 0.15
+    - 0.12
+    - 0.09
+    - 0.06
+    - 0.03
+    - 0.03
+    - 0.03
   timeout_seconds: 30  # Timeout for code execution
+
+final_judge:
+  enable: true
+  group_size: 4
 
 # Output Configuration
 output:

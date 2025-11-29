@@ -1,299 +1,123 @@
-# 🤖 Multi-Agent Meta HackerCup Starter Kit
+# Multi-Agent Meta HackerCup Starter Kit (Fork)
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![LangChain](https://img.shields.io/badge/LangChain-0.3+-green.svg)](https://python.langchain.com/)
-[![Google Gemini](https://img.shields.io/badge/Gemini-2.5%20Flash-orange.svg)](https://ai.google.dev/)
-[![FlamesBlue](https://img.shields.io/badge/FlamesBlue-v1-red.svg)](https://www.flamesblue.com)
+This repo started from the public **Multi-Agent Meta HackerCup Starter Kit**. The upstream project demonstrated a minimal three-agent workflow (Tester → Brute → Optimal) driven entirely by Google Gemini models. This fork keeps the same spirit but expands the architecture significantly to better support noisy competitive-programming statements, richer validation, and manual auditing.
 
-A multi-agent AI system that collaboratively solves competitive programming problems using iterative refinement with brute-force validation.
+## 1. Original Workflow (Upstream)
+- **Single pass pipeline:** TesterAgent generated 3–5 synthetic inputs, BruteAgent wrote a slow-but-correct solution, and OptimalAgent tried up to five efficient attempts. Each optimal attempt was compared directly with the brute output.
+- **Google-only models:** All agents called `google:gemini-2.5-flash` (or other Gemini SKUs) via LangChain and relied on a single API key (`GOOGLE_API_KEY`).
+- **Minimal bookkeeping:** Only the latest brute + optimal attempts and their outputs were stored under `workspace/`, and `results.json` captured a light summary for the HTML viewer.
+- **Docs-first onboarding:** README/QUICKSTART/SETUP_GEMINI laid out install steps, Gemini key setup, and the “standard” usage flow (edit `PROBLEM.txt`, run `python main.py`, open `viewer.html`).
 
-## 📖 Description
+## 2. What Changed in This Fork
+### Architecture & Agents
+1. **SampleExtractorAgent (`agents/sample_agent.py`)** – Uses an LLM to scrape the official sample input/output directly from the problem statement. The orchestrator now refuses to continue if it can’t extract both blocks.
+2. **Iterative brute forcing** – Instead of a single brute attempt, the orchestrator runs up to 12 tries at varying temperatures. Each attempt must pass official samples before the system even generates custom tests.
+3. **Normalized tester prompting** – TesterAgent now copies the official sample first, then appends 8–10 extra cases. It enforces strict formatting (no blank lines, accurate `T` prefix) so downstream parsers are less likely to break.
+4. **Temperature ladders everywhere** – Brute and optimal agents both receive per-attempt temperatures pulled from `config.yaml`, enabling controlled exploration.
+5. **FinalJudgeAgent (`agents/final_judge_agent.py`)** – After all optimal attempts run, a final judging pass can group them, ask an LLM to pick winners, and write comparator bundles for human review.
+6. **Model flexibility** – Every agent can target either OpenAI or Google providers by prefixing model names (e.g., `openai:gpt-5.1`). The fork currently defaults to OpenAI for all agents.
 
-**Multi-Agent Programming Problem Solver** was originally developed as a **starter kit for Meta Hacker Cup** and similar competitive programming contests. It demonstrates a sample strategy that contestants can experiment with and build upon.
+### Orchestrator Workflow
+1. **Step 1 – Sample extraction**: saves `workspace/sample_input.txt` and `workspace/sample_output.txt`.
+2. **Step 2 – Brute attempts**: loops until a brute solution compiles, runs on the official sample, and matches the sample output. Each attempt is logged (`workspace/brute_attempt_{n}.py` and metadata in `results.json`).
+3. **Step 3 – Tester inputs**: once a sample-passing brute exists, generates normalized test inputs (`workspace/small_inputs.txt`).
+4. **Step 4 – Brute execution**: runs the brute code on generated cases; failures feed detailed feedback back into the next brute attempt.
+5. **Step 5 – Optimal attempts**: up to 12 guided retries with per-attempt feedback, heuristic validation that the response “looks like Python,” and individual artifacts (`workspace/optimal_attempt_{n}.py` + outputs). Accepted attempts are copied to `workspace/optimal_success_{k}.py`.
+6. **Final judging + reporting**: optional final judge summary, enhanced `results.json` (sample IO, brute attempt log, judge verdicts), plus instructions to open the viewer via `python -m http.server 8000`.
 
-The system employs three specialized AI agents working in concert:
-- **TesterAgent** generates small test cases
-- **BruteAgent** creates a correct but inefficient solution
-- **OptimalAgent** iteratively develops an efficient solution, validated against the brute force output
+### Tooling & Config
+- `config.yaml` now contains both Google and OpenAI keys, per-stage temperature arrays, `max_brute_attempts`, final-judge toggles, and filenames for saved artifacts.
+- `requirements.txt` gained `langchain-openai`, since LangChain’s OpenAI wrapper is now used alongside `langchain-google-genai`.
+- `main.py` prints new metadata (number of brute attempts used, whether sample validation succeeded).
 
-This approach ensures correctness through differential testing while achieving optimal time complexity through AI-guided iteration.
+### Problem Statement
+`PROBLEM.txt` now ships with Meta Hacker Cup 2024 Round 2’s **“Captcha Sorting”** bitstring problem instead of the original Kadane example. You can overwrite this file with any other statement as before.
 
-## 🎯 Overview
+### Documentation Status
+The original README/QUICKSTART/SETUP_GEMINI/etc. were deleted in this fork. This document replaces them and explains both the upstream baseline and the new behavior. If you rely on Gemini-only instructions, reference the upstream repo or re-create similar docs tailored to your preferred provider.
 
-### Architecture
-
-![Architecture Diagram](strategy.png)
-
-
-## 🚀 Installation
-
+## 3. Getting Started (Current Fork)
 ### Prerequisites
+- Python 3.10+ recommended
+- `pip install -r requirements.txt`
+- API keys for any models you plan to call (`config.yaml` currently contains placeholder *real-looking* keys – **replace them with your own or load them from environment variables before publishing this repo**).
 
-- Python 3.8 or higher
-- pip package manager
+### Manage Secrets via `.env`
+1. Copy the example file and fill in your keys:
+   ```bash
+   cp .env.example .env
+   # edit .env to add GOOGLE_API_KEY / OPENAI_API_KEY
+   ```
+2. Values in `.env` are loaded automatically when `orchestrator.py` imports, so you usually don’t need to hardcode anything in `config.yaml`.
+3. If an environment variable is missing, the orchestrator falls back to whatever is written inside `config.yaml`.
 
-### Step 1: Clone the Repository
-
-```bash
-git clone <repository-url>
-cd temp-agents
-```
-
-### Step 2: Install Dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-This installs:
-- `langchain` - Multi-agent framework
-- `langchain-google-genai` - Google Gemini integration (FREE tier)
-- `pyyaml` - Configuration management
-
-### Step 3: Get FREE API Key
-
-**Google Gemini (FREE)**
-
-1. Visit: https://aistudio.google.com/app/apikey
-2. Click "Create API Key"
-3. Copy the generated key (starts with `AIza...`)
-
-## ⚙️ Configuration
-
-### Set API Key
-
-Edit `config.yaml`:
-
+### Configure Models & Secrets
+Edit `config.yaml` (leave API key fields blank unless you deliberately want file-based fallbacks):
 ```yaml
 api_keys:
-  # Google Gemini API Key - FREE TIER AVAILABLE!
-  google: "AIza...your-google-api-key"
-```
+  google: ""  # defaults to GOOGLE_API_KEY from environment/.env
+  openai: ""  # defaults to OPENAI_API_KEY from environment/.env
 
-### Choose Models
-
-The system uses **FREE** Google Gemini models. Default configuration:
-
-```yaml
 models:
-  tester_agent: "google:gemini-2.5-flash"
-  brute_agent: "google:gemini-2.5-flash"
-  optimal_agent: "google:gemini-2.5-flash"
-```
+  sample_agent: "openai:gpt-5.1"
+  tester_agent: "openai:gpt-5.1"
+  brute_agent: "openai:gpt-5.1"
+  optimal_agent: "openai:gpt-5.1"
+  final_judge_agent: "openai:gpt-5.1"
 
-#### Available Google Gemini Models (FREE Tier)
-
-Check https://ai.google.dev/gemini-api/docs/rate-limits for latest rate limits and free-tier quota.
-
-- `google:gemini-2.5-flash` - Fast, efficient (250 free requests/day)
-- `google:gemini-2.5-flash-lite` - Faster, cheaper (1000 free requests/day)
-- `google:gemini-2.5-pro` - Most capable (100 free requests/day)
-
-
-### Adjust Execution Parameters
-
-```yaml
 execution:
-  max_optimal_attempts: 5      # Maximum retry attempts
-  timeout_seconds: 30          # Code execution timeout
+  max_brute_attempts: 12
+  max_optimal_attempts: 12
+  brute_temperatures: [...]
+  optimal_temperatures: [...]
 ```
+Any entry can be switched to `google:gemini-2.5-flash` or another supported ID if you prefer Gemini.
 
-### Customize Output Directory
+### Run the Solver
+1. Fill `PROBLEM.txt` with the problem statement you want solved (current default is Captcha Sorting).
+2. Execute:
+   ```bash
+   python main.py
+   ```
+3. Watch the CLI output. It now shows step-by-step progress plus per-attempt metadata.
+4. To inspect the HTML report:
+   ```bash
+   python -m http.server 8000
+   # open http://localhost:8000/viewer.html
+   ```
 
-```yaml
-output:
-  workspace_dir: "./workspace"           # Output directory
-  preserve_intermediate: true            # Keep all generated files
-```
-
-## 📝 Usage
-
-### Step 1: Define Your Problem
-
-Create or edit `PROBLEM.txt` with your problem statement:
-
-```
-Given an array of integers, find the maximum sum of any contiguous subarray.
-
-Input Format:
-- First line: n (size of array)
-- Second line: n space-separated integers
-
-Output Format:
-- Single integer: maximum subarray sum
-
-Constraints:
-- 1 <= n <= 10^5
-- -10^4 <= array[i] <= 10^4
-
-Example:
-Input:
-5
--2 1 -3 4 -1
-
-Output:
-4
-
-Explanation: The subarray [4] has the maximum sum of 4.
-```
-
-### Step 2: Run the Solver
-
-```bash
-python main.py
-```
-
-**What Happens:**
-
-1. **Loads Problem** - Reads `PROBLEM.txt`
-2. **Generates Test Cases** - TesterAgent creates 3-5 small test inputs
-3. **Creates Brute Force** - BruteAgent generates a correct O(n²-n³) solution
-4. **Executes Brute Force** - Saves expected outputs
-5. **Optimizes Solution** - OptimalAgent attempts efficient O(n) solution
-6. **Validates & Retries** - Compares outputs, retries with feedback if needed
-7. **Saves Results** - Generates `workspace/results.json` for the viewer
-
-**Live Progress Indicators:**
-
-```
-⠋ Generating test cases with TesterAgent... (00:03)
-⠙ Generating brute force solution with BruteAgent... (00:05)
-⠹ Generating optimal solution (attempt 1/5)... (00:04)
-```
-
-### Step 3: View Results
-
-#### Start HTTP Server
-
-```bash
-python -m http.server 8000
-```
-
-Then open: http://localhost:8000/viewer.html
-
-*(HTTP server needed to avoid CORS restrictions)*
-
-
-## 📁 Output Files
-
-All files saved to `workspace/` (configurable):
-
+## 4. Outputs & Artifacts
 ```
 workspace/
-├── small_inputs.txt              # Generated test cases
-├── small_outputs.txt             # Expected outputs (from brute force)
-├── brute.py                      # Brute force solution
-├── optimal_attempt_1.py          # First attempt at optimal solution
-├── optimal_attempt_1_output.txt  # Output from first attempt
-├── optimal_attempt_2.py          # Second attempt (if needed)
-├── optimal_attempt_2_output.txt
-├── ...                           # Up to 10 attempts
-├── optimal.py                    # Final solution
-└── results.json                  # Complete metadata for viewer
+├── sample_input.txt / sample_output.txt   # Extracted official samples
+├── brute_attempt_{n}.py                   # Every brute attempt
+├── brute.py / small_outputs.txt           # Latest validated brute code + outputs
+├── small_inputs.txt                       # Normalized tester inputs
+├── optimal_attempt_{n}.py / *_output.txt  # Optimal attempts + outputs
+├── optimal_success_{k}.py                 # Any attempt that matched brute outputs
+├── final_comparator.txt                   # Grouped winners for manual review (if judge enabled)
+└── results.json                           # Rich metadata for viewer + auditing
 ```
+The repo currently tracks many of these files; consider adding `workspace/` to `.gitignore` if you don’t want generated artifacts under version control.
 
+## 5. Key Differences at a Glance
+| Area | Upstream | This Fork |
+| --- | --- | --- |
+| Agents | Tester, Brute, Optimal | Adds SampleExtractor & FinalJudge; all agents configurable per provider |
+| Model Provider | Google Gemini only | OpenAI or Google per agent |
+| Brute Strategy | Single attempt | Up to 12 attempts with sample gating + feedback |
+| Inputs | Generated tests only | Official sample extraction + normalized custom tests |
+| Optimal Loop | Up to 5 attempts, immediate exit on success | Up to 12 attempts, saves every success, optional final judge |
+| Metadata | Minimal | Detailed attempt logs, sample validation status, judge summaries |
+| Docs | README + quickstart suite | Consolidated into this README |
 
-## 📦 Project Structure
+## 6. Caveats
+- **Secrets:** Never commit live API keys; the ones currently in `config.yaml` must be rotated or moved to environment variables before you publish this fork.
+- **Workspace noise:** Generated files can be large. Clean or ignore them before committing.
+- **LLM Cost/Quota:** Increasing brute/optimal attempts to 12x each dramatically increases API usage. Adjust `max_*_attempts` and temperature ladders to fit your quota.
 
-```
-temp-agents/
-├── PROBLEM.txt                   # Your problem statement (REQUIRED)
-├── config.yaml                   # Configuration file
-├── main.py                       # Entry point
-├── orchestrator.py               # Multi-agent coordinator
-├── viewer.html                   # Web-based results viewer
-├── requirements.txt              # Python dependencies
-├── README.md                     # This file
-├── QUICKSTART.md                 # Quick reference guide
-├── LICENSE                       # MIT License
-├── agents/
-│   ├── __init__.py
-│   ├── tester_agent.py          # Test case generator
-│   ├── brute_agent.py           # Brute force solution generator
-│   └── optimal_agent.py         # Optimal solution generator
-├── utils/
-│   ├── __init__.py
-│   ├── executor.py              # Code execution utility
-│   ├── comparator.py            # Output comparison utility
-│   └── progress.py              # Live progress indicators
-└── workspace/                    # Generated files (gitignored)
-    └── ...
-```
-
-## 🤝 Contributing
-
-Contributions are welcome! This is a starter kit meant to be extended and improved. Ideas on how you can extend it is given in the section below.
-
-## 💡 Advanced Tips & Customization for Meta Hacker Cup
-
-- **Add WebSearchAgent** - Allow models to search and learn algorithm approaches on the fly while solving problems
-- **Enhance prompts** - Include problem-specific hints (DP, greedy, graph) and complexity targets in agent system prompts
-- **Create specialized agents** - Add DebugAgent (analyzes failures), ValidatorAgent (checks logic), or ComplexityAgent (estimates time/space)
-- **Provide runtime feedback** - Feed execution time, memory usage, and stack traces to OptimalAgent for faster iteration
-- **Parallel solution generation** - Create multiple approaches (DP, greedy, binary search) simultaneously and pick the fastest correct one
-- **Problem-specific models** - Detect problem type and choose appropriate models (lighter for practice, stronger for competition)
-- **Add support for more programming languages** - Extend beyond Python to support C++, Java, Rust, etc.
-- **Implement parallel test execution** - Run multiple test cases simultaneously for faster validation
-- **Add complexity analysis display** - Show time/space complexity analysis in the viewer
-- **Support for interactive problems** - Handle problems requiring interaction with a judge
-- **Multi-file solutions** - Support projects with multiple modules and dependencies
-- **Custom test case input** - Allow users to provide their own test cases
-
-## 📄 License
-
-MIT License
-
-Copyright (c) 2025 Nikita Agarwal, Nalin Abrol, Manas Kumar Verma, Nikhil Tadigopulla, Vivek Verma
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-## 🙏 Acknowledgments
-
-- **LangChain** - Multi-agent framework
-- **Google** - Free Gemini API access
-- **FlamesBlue** - Beautiful web viewer
-- **KaTeX** - LaTeX rendering
-- **Prism.js** - Syntax highlighting
-- **Meta** - Inspiration from Hacker Cup
-
-## 🔗 Links
-
-- **Google Gemini API**: https://ai.google.dev/
-- **LangChain Documentation**: https://python.langchain.com/
-- **Meta Hacker Cup**: https://www.facebook.com/codingcompetitions/hacker-cup
-- **FlamesBlue**: https://www.flamesblue.com
+## 7. License
+This repo remains under the MIT License with the original copyright notice (`LICENSE`). You may add an additional notice documenting your modifications if desired.
 
 ---
-
-**Built with ❤️ for the competitive programming community**
-
-*Starter kit for Meta Hacker Cup and similar competitions*
-
-## 🌟 Special Shoutout
-
-<p align="center">
-  <a href="https://www.flamesblue.com" target="_blank">
-    <img src="https://www.flamesblue.com/flame-icon.svg" alt="FlamesBlue Logo" width="60" height="60">
-  </a>
-</p>
-
-<p align="center">
-  <strong>Thanks to <a href="https://www.flamesblue.com" target="_blank">FlamesBlue</a> for building the beautiful web viewer!</strong>
-</p>
+Questions or ideas? Open an issue or continue extending the multi-agent pipeline to suit your Hacker Cup runs!

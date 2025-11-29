@@ -1,25 +1,59 @@
 import sys
 
-def solve():
-    n = int(sys.stdin.readline())
-    arr = list(map(int, sys.stdin.readline().split()))
+def solve_case(N, S):
+    s = list(S)
+    ops = []
+    n2 = 2 * N
 
-    # Kadane's Algorithm
-    # max_so_far stores the maximum sum found globally
-    # current_max stores the maximum sum of a subarray ending at the current position
-    
-    max_so_far = arr[0]
-    current_max = arr[0]
+    def do_op(A, B):
+        ops.append((A[:], B[:]))
+        for i in range(N):
+            ai = A[i] - 1
+            bi = B[i] - 1
+            s[ai], s[bi] = s[bi], s[ai]
 
-    for i in range(1, n):
-        # For the current element arr[i], the maximum sum ending here is either
-        # arr[i] itself (starting a new subarray) or arr[i] added to the
-        # maximum sum ending at the previous position (extending the subarray).
-        current_max = max(arr[i], current_max + arr[i])
-        
-        # Update the global maximum sum found so far.
-        max_so_far = max(max_so_far, current_max)
-    
-    print(max_so_far)
+    while True:
+        i = 0
+        while i < n2 and s[i] == '0':
+            i += 1
+        j = n2 - 1
+        while j >= 0 and s[j] == '1':
+            j -= 1
+        if i >= j:
+            break
+        A = []
+        B = []
+        for k in range(1, N + 1):
+            if k <= i:
+                A.append(k)
+            else:
+                B.append(k)
+        for k in range(N + 1, n2 + 1):
+            if k <= j + 1:
+                B.append(k)
+            else:
+                A.append(k)
+        do_op(A, B)
+        if len(ops) > 10 * N:
+            return None
+    return ops
 
-solve()
+def main():
+    it = iter(sys.stdin.read().strip().split())
+    T = int(next(it))
+    out_lines = []
+    for tc in range(1, T + 1):
+        N = int(next(it))
+        S = next(it).strip()
+        ops = solve_case(N, S)
+        if ops is None:
+            out_lines.append(f"Case #{tc}: -1")
+        else:
+            out_lines.append(f"Case #{tc}: {len(ops)}")
+            for A, B in ops:
+                out_lines.append(" ".join(map(str, A)))
+                out_lines.append(" ".join(map(str, B)))
+    sys.stdout.write("\n".join(out_lines))
+
+if __name__ == "__main__":
+    main()

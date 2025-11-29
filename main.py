@@ -48,6 +48,10 @@ def main():
     print("=" * 80)
     print(f"Success: {success}")
     print(f"Attempts used: {metadata['attempts']}/{orchestrator.max_attempts}")
+    if 'brute_attempts_used' in metadata:
+        print(f"Brute attempts used: {metadata['brute_attempts_used']}/{orchestrator.max_brute_attempts}")
+    if metadata.get('sample_cases_available'):
+        print(f"Sample validation passed: {metadata.get('sample_validation_passed', False)}")
     print(f"Test cases generated: {metadata['test_cases_generated']}")
     print(f"Brute force generated: {metadata['brute_force_generated']}")
     print(f"Brute force executed: {metadata['brute_force_executed']}")

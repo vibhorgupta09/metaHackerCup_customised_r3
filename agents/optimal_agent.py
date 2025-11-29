@@ -1,3 +1,4 @@
+from langchain_openai import ChatOpenAI
 from langchain_google_genai import ChatGoogleGenerativeAI
 from typing import Optional
 
@@ -6,17 +7,7 @@ class OptimalAgent:
     """Agent responsible for generating optimal/efficient solutions."""
 
     def __init__(self, model_name: str):
-        # Parse model name (format: "google:model-name")
-        if ":" in model_name:
-            provider, model = model_name.split(":", 1)
-        else:
-            model = model_name
-
-        # Remove 'models/' prefix if present - LangChain adds it automatically
-        if model.startswith("models/"):
-            model = model.replace("models/", "")
-
-        self.model = ChatGoogleGenerativeAI(model=model, temperature=0.3)
+        self.model = self._create_model(model_name, temperature=0.6)
         self.system_prompt = """You are an expert competitive programmer.
 
 Your task is to generate an EFFICIENT solution in Python that meets the time/space constraints.
@@ -29,15 +20,21 @@ Guidelines:
 - Handle the exact input/output format specified
 - Include proper input parsing
 - The solution must be CORRECT (passing all test cases)
-- No unnecessary comments or explanations in code
+- No comments or explanations in code
 - Make sure the solution is complete and runnable
 
 Output ONLY the Python code, no markdown, no explanations.
+ABSOLUTELY NO EXPLANATIONS OR MARKDOWN.
+OUTPUT RAW PYTHON CODE ONLY.
 """
 
-    def generate_solution(self, problem_statement: str, feedback: Optional[str] = None, attempt: int = 1) -> str:
+    def generate_solution(self, problem_statement: str, temperature: float = 0.3,
+                          feedback: Optional[str] = None, attempt: int = 1) -> str:
         """Generate optimal solution for the given problem."""
-        user_message = f"Generate an optimal Python solution for this problem:\n\n{problem_statement}"
+        user_message = (
+            "REMINDER: Respond with ONLY raw Python code. No explanations, no markdown.\n\n"
+            f"Generate an optimal Python solution for this problem:\n\n{problem_statement}"
+        )
 
         if feedback:
             user_message += f"\n\n=== FEEDBACK FROM ATTEMPT {attempt - 1} ===\n{feedback}\n\nPlease fix the issues and generate a corrected solution."
@@ -47,7 +44,7 @@ Output ONLY the Python code, no markdown, no explanations.
             {"role": "user", "content": user_message}
         ]
 
-        response = self.model.invoke(messages)
+        response = self.model.invoke(messages, temperature=temperature)
         code = response.content.strip()
 
         # Remove markdown code blocks if present
@@ -57,3 +54,19 @@ Output ONLY the Python code, no markdown, no explanations.
             code = code.split("```")[1].split("```")[0].strip()
 
         return code
+
+    @staticmethod
+    def _create_model(model_name: str, **kwargs):
+        model = model_name
+        if ":" in model_name:
+            provider, model = model_name.split(":", 1)
+        else:
+            provider = "openai"
+        if model.startswith("models/"):
+            model = model.replace("models/", "")
+        provider = provider.lower()
+        if provider == "google":
+            return ChatGoogleGenerativeAI(model=model, **kwargs)
+        if provider == "openai":
+            return ChatOpenAI(model=model, **kwargs)
+        raise ValueError(f"Unsupported provider '{provider}'. Use google:* or openai:* models.")
