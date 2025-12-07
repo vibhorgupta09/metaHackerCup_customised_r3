@@ -14,7 +14,7 @@ This repo started from the public **Multi-Agent Meta HackerCup Starter Kit**. Th
 2. **Iterative brute forcing** – Instead of a single brute attempt, the orchestrator runs up to 12 tries at varying temperatures. Each attempt must pass official samples before the system even generates custom tests.
 3. **Normalized tester prompting** – TesterAgent now copies the official sample first, then appends 8–10 extra cases. It enforces strict formatting (no blank lines, accurate `T` prefix) so downstream parsers are less likely to break.
 4. **Temperature ladders everywhere** – Brute and optimal agents both receive per-attempt temperatures pulled from `config.yaml`, enabling controlled exploration.
-5. **FinalJudgeAgent (`agents/final_judge_agent.py`)** – After all optimal attempts run, a final judging pass can group them, ask an LLM to pick winners, and write comparator bundles for human review.
+5. **FinalJudgeAgent (`agents/final_judge_agent.py`)** – After all optimal attempts run, a final judging pass can group them, ask an LLM to pick winners by writting it into a comparator file.
 6. **Model flexibility** – Every agent can target either OpenAI or Google providers by prefixing model names (e.g., `openai:gpt-5.1`). The fork currently defaults to OpenAI for all agents.
 
 ### Orchestrator Workflow
